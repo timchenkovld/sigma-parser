@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.Objects;
 
 @Getter
 @Setter
@@ -26,5 +27,18 @@ public class Link {
                 ", name='" + name + '\'' +
                 ", parent=" + (parent != null ? parent.getName() : "") +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Link link = (Link) o;
+        return Objects.equals(url, link.url) && Objects.equals(name, link.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(url, name);
     }
 }
