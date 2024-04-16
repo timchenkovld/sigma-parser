@@ -18,8 +18,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public Category createCategory(Category category, Link link) {
         List<Category> existingCategories = categoryRepository
-                //
-                .findCategoryByName(link.getName());
+                .findCategoryByNameOrUrl(link.getName(), link.getUrl());
 
         if (existingCategories.isEmpty()) {
             Category newCategory = new Category();
@@ -57,7 +56,6 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public Category findCategory(String name) {
-//        List<Category> categories = categoryRepository.findCategoryByLink(name);
         List<Category> categories = categoryRepository.findCategoryByName(name);
         if (!categories.isEmpty()) {
             return categories.get(0);

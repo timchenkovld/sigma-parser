@@ -8,9 +8,10 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface CategoryRepository extends JpaRepository<Category, Long> {
-    @Query("SELECT c FROM Category c WHERE c.url = :url")
-    List<Category> findCategoryByLink(
-            @Param("url")String url
+    @Query("SELECT c FROM Category c WHERE c.name = :name OR c.url = :url")
+    List<Category> findCategoryByNameOrUrl(
+            @Param("name") String name,
+            @Param("url") String url
     );
 
     @Query("SELECT c FROM Category c WHERE c.name = :name")

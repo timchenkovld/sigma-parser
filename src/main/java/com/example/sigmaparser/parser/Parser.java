@@ -19,9 +19,6 @@ import java.util.List;
 import java.util.Set;
 
 
-// Добавити сервіс
-// Зберігаємо в базу категорії і підкатегорії
-// Розбити метод
 @Component
 @RequiredArgsConstructor
 public class Parser {
@@ -34,9 +31,9 @@ public class Parser {
         parseLinks();
     }
 
-    public List<Link> parseLinks() {
-        //  Set<Link> links = new HashSet<>();
-        List<Link> links = new ArrayList<>();
+    public Set<Link> parseLinks() {
+          Set<Link> links = new HashSet<>();
+//        List<Link> links = new ArrayList<>();
         try {
             Document doc = Jsoup.connect(SIGMA_URL).get();
             Elements rootCategories = doc.select("ul.nav.navbar-nav.category-nav.fl_left>li");
@@ -60,17 +57,16 @@ public class Parser {
         link.setLinkType(LinkType.ROOT_CATEGORY);
         link.setChildLinks(new ArrayList<>());
 
-        Category parentCategory = categoryService.createCategory(null, link);
 
         Elements subcategories = category.select("ul.nav.category-nav-open-drop>li");
         for (Element subcategory : subcategories) {
-            Link subLink = parseSubcategory(subcategory, link, parentCategory);
+            Link subLink = parseSubcategory(subcategory, link);
             link.getChildLinks().add(subLink);
         }
         return link;
     }
 
-    private Link parseSubcategory(Element subcategory, Link parentLink, Category parentCategory) {
+    private Link parseSubcategory(Element subcategory, Link parentLink) {
         Link subLink = new Link();
         subLink.setParent(parentLink);
         Element getUrlElement = subcategory.selectFirst("a");
@@ -78,18 +74,18 @@ public class Parser {
         subLink.setName(getUrlElement.text());
         subLink.setChildLinks(new ArrayList<>());
 
-        Category subParentCategory = categoryService.createCategory(parentCategory, subLink);
+        Category parentCategory = categoryService.createCategory(null, subLink);
 
         Elements catalogs = subcategory.select("div.category-nav-open-drop-sub>a");
         if (!catalogs.isEmpty()) {
             subLink.setLinkType(LinkType.CATEGORY);
             for (Element catalog : catalogs) {
-                Link productListLink = parseCatalog(catalog, subLink, subParentCategory);
+                Link productListLink = parseCatalog(catalog, subLink, parentCategory);
                 subLink.getChildLinks().add(productListLink);
             }
         } else {
             subLink.setLinkType(LinkType.PRODUCT_LIST);
-            parseProductCards(subLink, subParentCategory);
+            parseProductCards(subLink, parentCategory);
         }
         return subLink;
     }
