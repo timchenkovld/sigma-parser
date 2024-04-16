@@ -29,4 +29,7 @@ public class Category {
 
     @OneToMany(mappedBy = "parentCategory", cascade = CascadeType.REMOVE)
     private List<Category> categories;
+
+    @Column(name = "url")
+    private String url;
 }
