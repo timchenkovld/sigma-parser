@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Entity
@@ -25,7 +24,7 @@ public class Product {
     private String name;
 
     @Column(name = "price")
-    private BigDecimal price;
+    private String price;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
@@ -33,7 +32,6 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
     private List<ProductImage> images;
 
-    @ManyToOne
-    @JoinColumn(name = "category_id")
-    private Category category;
+    @Column(name = "url")
+    private String url;
 }

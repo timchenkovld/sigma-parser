@@ -18,7 +18,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public Category createCategory(Category category, Link link) {
         List<Category> existingCategories = categoryRepository
-                .findCategoryByNameOrUrl(link.getName(), link.getUrl());
+                .findCategoryByNameAndUrl(link.getName(), link.getUrl());
 
         if (existingCategories.isEmpty()) {
             Category newCategory = new Category();
@@ -32,6 +32,11 @@ public class CategoryServiceImpl implements CategoryService {
         } else {
             return existingCategories.get(0);
         }
+    }
+
+    @Override
+    public List<Category> getAllCategories() {
+        return categoryRepository.findAll();
     }
 
     @Override
@@ -62,11 +67,6 @@ public class CategoryServiceImpl implements CategoryService {
         } else {
             return null;
         }
-    }
-
-    @Override
-    public List<Category> getCategory() {
-        return categoryRepository.findAll();
     }
 }
 

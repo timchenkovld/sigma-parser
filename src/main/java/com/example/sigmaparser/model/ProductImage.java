@@ -22,6 +22,6 @@ public class ProductImage {
     @JoinColumn(name = "product_id")
     private Product product;
 
-    @Column(name = "image_url")
+    @Column(name = "image_url", unique = true)
     private String imageUrl;
 }

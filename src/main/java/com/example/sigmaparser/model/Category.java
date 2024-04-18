@@ -20,7 +20,7 @@ public class Category {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "name")
+    @Column(name = "name", unique = true)
     private String name;
 
     @ManyToOne
@@ -30,6 +30,6 @@ public class Category {
     @OneToMany(mappedBy = "parentCategory", cascade = CascadeType.REMOVE)
     private List<Category> categories;
 
-    @Column(name = "url")
+    @Column(name = "url", unique = true)
     private String url;
 }
