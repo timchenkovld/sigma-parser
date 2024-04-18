@@ -1,9 +1,8 @@
 package com.example.sigmaparser.parser;
 
-import com.example.sigmaparser.model.Category;
-import com.example.sigmaparser.model.Link;
-import com.example.sigmaparser.model.LinkType;
+import com.example.sigmaparser.model.*;
 import com.example.sigmaparser.service.CategoryService;
+import com.example.sigmaparser.service.ProductService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
@@ -13,10 +12,9 @@ import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 
 @Component
@@ -26,22 +24,27 @@ public class Parser {
 
     private final CategoryService categoryService;
 
+    private final ProductService productService;
+
     @PostConstruct
     public void init() {
-        parseLinks();
+        parseCategories();
+
+        List<Category> categories = categoryService.getAllCategories().stream()
+                .filter(category -> category.getParentCategory() != null).collect(Collectors.toList());
+        parseProductCards(categories);
     }
 
-    public Set<Link> parseLinks() {
-          Set<Link> links = new HashSet<>();
-//        List<Link> links = new ArrayList<>();
+    public Set<Link> parseCategories() {
+        Set<Link> links = new HashSet<>();
         try {
             Document doc = Jsoup.connect(SIGMA_URL).get();
             Elements rootCategories = doc.select("ul.nav.navbar-nav.category-nav.fl_left>li");
 
-            for (Element category : rootCategories) {
+            getFor(rootCategories, category -> {
                 Link link = parseCategory(category);
                 links.add(link);
-            }
+            });
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -57,12 +60,9 @@ public class Parser {
         link.setLinkType(LinkType.ROOT_CATEGORY);
         link.setChildLinks(new ArrayList<>());
 
-
-        Elements subcategories = category.select("ul.nav.category-nav-open-drop>li");
-        for (Element subcategory : subcategories) {
-            Link subLink = parseSubcategory(subcategory, link);
-            link.getChildLinks().add(subLink);
-        }
+        getFor(category.select("ul.nav.category-nav-open-drop>li"), (subcategory) -> {
+            link.getChildLinks().add(parseSubcategory(subcategory, link));
+        });
         return link;
     }
 
@@ -79,13 +79,12 @@ public class Parser {
         Elements catalogs = subcategory.select("div.category-nav-open-drop-sub>a");
         if (!catalogs.isEmpty()) {
             subLink.setLinkType(LinkType.CATEGORY);
-            for (Element catalog : catalogs) {
+            getFor(catalogs, catalog -> {
                 Link productListLink = parseCatalog(catalog, subLink, parentCategory);
                 subLink.getChildLinks().add(productListLink);
-            }
+            });
         } else {
             subLink.setLinkType(LinkType.PRODUCT_LIST);
-            parseProductCards(subLink, parentCategory);
         }
         return subLink;
     }
@@ -98,31 +97,76 @@ public class Parser {
         productListLink.setLinkType(LinkType.PRODUCT_LIST);
         productListLink.setChildLinks(new ArrayList<>());
 
-        parseProductCards(productListLink, parentCategory);
-
         categoryService.createCategory(parentCategory, productListLink);
 
         return productListLink;
     }
-
-    private void parseProductCards(Link link, Category parentCategory) {
-        try {
-            Document doc = Jsoup.connect(link.getUrl()).get();
-            Elements productElements = doc.select("div.showcase.clearfix#showcaseview>div");
-
-            for (Element productElement : productElements) {
-                Elements productCards = productElement.select("div.thumbnail>div.caption");
-                for (Element productCard : productCards) {
-                    Link productCardLink = new Link();
-                    productCardLink.setParent(link);
-                    Element getProductLinkElement = productCard.selectFirst("a");
-                    productCardLink.setUrl(getProductLinkElement.attr("abs:href"));
-                    productCardLink.setName(productCard.text());
-                    productCardLink.setLinkType(LinkType.PRODUCT_CARD);
+    public void parseProductCards(List<Category> categories) {
+        for (Category category : categories) {
+            String categoryUrl = category.getUrl();
+            try {
+                List<String> productCardUrls = extractProductCardUrls(categoryUrl);
+                for (String productCardUrl : productCardUrls) {
+                    Product product = extractProductData(productCardUrl);
+                    productService.createProduct(product);
                 }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        }
+    }
+
+    private List<String> extractProductCardUrls(String categoryUrl) throws IOException {
+        List<String> productCardUrls = new ArrayList<>();
+        Document doc = Jsoup.connect(categoryUrl).get();
+        Elements productCardsLinks = doc.select("div.caption>div.name>a");
+        getFor(productCardsLinks, element -> productCardUrls.add(element.attr("abs:href")));
+        return productCardUrls;
+    }
+
+    private Product extractProductData(String productCardUrl) throws IOException {
+        Document docProductCardPage = Jsoup.connect(productCardUrl).get();
+        Product product = new Product();
+        Element nameElement = docProductCardPage.selectFirst("h1.detail-goods-title");
+        String name = nameElement != null ? nameElement.text() : null;
+        product.setName(name);
+
+        Element priceElement = docProductCardPage.selectFirst("div.price-box.price_block>span.price");
+        String price = priceElement != null ? priceElement.text() : null;
+        product.setPrice(price);
+
+        StringBuilder description = new StringBuilder();
+        Elements descriptionElements = docProductCardPage.select("div.wr-detail-table-tab>div.detail-table-box");
+        getFor(descriptionElements, element -> description.append(element.text()).append("\n"));
+        product.setDescription(description.toString().trim());
+
+        List<String> imageUrls = new ArrayList<>();
+        Elements imageElements = docProductCardPage.select("div.swiper-wrapper.detail-goods-min-img-wrapper img");
+        getFor(imageElements, element -> imageUrls.add(element.attr("abs:src")));
+
+        List<ProductImage> productImages = new ArrayList<>();
+//        getFor(imageUrls, imageUrl -> {
+//            ProductImage productImage = new ProductImage();
+//            productImage.setImageUrl(imageUrl);
+//            productImage.setProduct(product);
+//            productImages.add(productImage);
+//        });
+        for (String imageUrl : imageUrls) {
+            ProductImage productImage = new ProductImage();
+            productImage.setImageUrl(imageUrl);
+            productImage.setProduct(product);
+            productImages.add(productImage);
+        }
+        product.setImages(productImages);
+
+        product.setUrl(productCardUrl);
+
+        return product;
+    }
+
+    private void getFor(List<Element> list, Consumer<Element> processor) {
+        for (Element el : list) {
+            processor.accept(el);
         }
     }
 }
