@@ -184,6 +184,10 @@ public class Parser {
 
         product.setUrl(productCardUrl);
 
+        Element statusElement = docProductCardPage.selectFirst("div.detail-goods-status");
+        String status = statusElement != null ? statusElement.text() : null;
+        product.setAvailable(status != null && status.equalsIgnoreCase("В наявності"));
+
         return product;
     }
 
