@@ -34,4 +34,7 @@ public class Product {
 
     @Column(name = "url")
     private String url;
+
+    @Column(name = "available")
+    private boolean isAvailable;
 }
