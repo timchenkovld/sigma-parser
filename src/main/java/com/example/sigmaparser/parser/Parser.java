@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -25,6 +27,7 @@ public class Parser {
     private final CategoryService categoryService;
 
     private final ProductService productService;
+    private final ExecutorService executor = Executors.newFixedThreadPool(3);
 
     @PostConstruct
     public void init() {
@@ -32,7 +35,28 @@ public class Parser {
 
         List<Category> categories = categoryService.getAllCategories().stream()
                 .filter(category -> category.getParentCategory() != null).collect(Collectors.toList());
-        parseProductCards(categories);
+
+        List<List<Category>> dividedCategories = divideList(categories, 3);
+
+        getFor(dividedCategories, categoryChunk -> {
+            executor.submit(() -> {
+                try {
+                    Thread.sleep(1000);
+                    parseProductCards(categoryChunk);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            });
+        });
+    }
+
+    private <T> List<List<T>> divideList(List<T> list, int parts) {
+        List<List<T>> dividedList = new ArrayList<>();
+        int chunkSize = (int) Math.ceil((double) list.size() / parts);
+        for (int i = 0; i < list.size(); i += chunkSize) {
+            dividedList.add(new ArrayList<>(list.subList(i, Math.min(i + chunkSize, list.size()))));
+        }
+        return dividedList;
     }
 
     public Set<Link> parseCategories() {
@@ -101,19 +125,24 @@ public class Parser {
 
         return productListLink;
     }
+
     public void parseProductCards(List<Category> categories) {
-        for (Category category : categories) {
+        getFor(categories, category -> {
             String categoryUrl = category.getUrl();
             try {
                 List<String> productCardUrls = extractProductCardUrls(categoryUrl);
-                for (String productCardUrl : productCardUrls) {
-                    Product product = extractProductData(productCardUrl);
-                    productService.createProduct(product);
-                }
+                getFor(productCardUrls, productCardUrl -> {
+                    try {
+                        Product product = extractProductData(productCardUrl);
+                        productService.createProduct(product);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
+        });
     }
 
     private List<String> extractProductCardUrls(String categoryUrl) throws IOException {
@@ -145,18 +174,12 @@ public class Parser {
         getFor(imageElements, element -> imageUrls.add(element.attr("abs:src")));
 
         List<ProductImage> productImages = new ArrayList<>();
-//        getFor(imageUrls, imageUrl -> {
-//            ProductImage productImage = new ProductImage();
-//            productImage.setImageUrl(imageUrl);
-//            productImage.setProduct(product);
-//            productImages.add(productImage);
-//        });
-        for (String imageUrl : imageUrls) {
+        getFor(imageUrls, imageUrl -> {
             ProductImage productImage = new ProductImage();
             productImage.setImageUrl(imageUrl);
             productImage.setProduct(product);
             productImages.add(productImage);
-        }
+        });
         product.setImages(productImages);
 
         product.setUrl(productCardUrl);
@@ -164,8 +187,8 @@ public class Parser {
         return product;
     }
 
-    private void getFor(List<Element> list, Consumer<Element> processor) {
-        for (Element el : list) {
+    private <T> void getFor(List<T> list, Consumer<T> processor) {
+        for (T el : list) {
             processor.accept(el);
         }
     }
