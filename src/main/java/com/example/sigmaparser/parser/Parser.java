@@ -5,6 +5,8 @@ import com.example.sigmaparser.service.CategoryService;
 import com.example.sigmaparser.service.ProductService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -27,7 +29,7 @@ public class Parser {
     private final CategoryService categoryService;
 
     private final ProductService productService;
-    private final ExecutorService executor = Executors.newFixedThreadPool(3);
+    private final ExecutorService executor = Executors.newFixedThreadPool(4);
 
     @PostConstruct
     public void init() {
@@ -41,13 +43,14 @@ public class Parser {
         getFor(dividedCategories, categoryChunk -> {
             executor.submit(() -> {
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(getRandomTimeout());
                     parseProductCards(categoryChunk);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             });
         });
+        executor.shutdown();
     }
 
     private <T> List<List<T>> divideList(List<T> list, int parts) {
@@ -65,10 +68,12 @@ public class Parser {
             Document doc = Jsoup.connect(SIGMA_URL).get();
             Elements rootCategories = doc.select("ul.nav.navbar-nav.category-nav.fl_left>li");
 
-            getFor(rootCategories, category -> {
-                Link link = parseCategory(category);
-                links.add(link);
-            });
+            if (ObjectUtils.isNotEmpty(rootCategories)) {
+                getFor(rootCategories, category -> {
+                    Link link = parseCategory(category);
+                    links.add(link);
+                });
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -127,10 +132,11 @@ public class Parser {
     }
 
     public void parseProductCards(List<Category> categories) {
+        Set<String> visitedUrls = new HashSet<>();
         getFor(categories, category -> {
             String categoryUrl = category.getUrl();
             try {
-                List<String> productCardUrls = extractProductCardUrls(categoryUrl);
+                List<String> productCardUrls = extractProductCardUrls(categoryUrl, visitedUrls);
                 getFor(productCardUrls, productCardUrl -> {
                     try {
                         Product product = extractProductData(productCardUrl);
@@ -145,11 +151,26 @@ public class Parser {
         });
     }
 
-    private List<String> extractProductCardUrls(String categoryUrl) throws IOException {
+    private List<String> extractProductCardUrls(String categoryUrl, Set<String> visitedUrls) throws IOException {
         List<String> productCardUrls = new ArrayList<>();
         Document doc = Jsoup.connect(categoryUrl).get();
         Elements productCardsLinks = doc.select("div.caption>div.name>a");
         getFor(productCardsLinks, element -> productCardUrls.add(element.attr("abs:href")));
+
+        visitedUrls.add(categoryUrl);
+
+        Element pagination = doc.selectFirst("div.pagination");
+        if (pagination != null) {
+            Element nextLink = pagination.selectFirst("li.right>a");
+            if (nextLink != null) {
+                String nextPageUrl = nextLink.attr("abs:href");
+
+                if (!visitedUrls.contains(nextPageUrl) && !nextPageUrl.equals(categoryUrl)) {
+                    productCardUrls.addAll(extractProductCardUrls(nextPageUrl, visitedUrls));
+                }
+            }
+        }
+
         return productCardUrls;
     }
 
@@ -157,11 +178,11 @@ public class Parser {
         Document docProductCardPage = Jsoup.connect(productCardUrl).get();
         Product product = new Product();
         Element nameElement = docProductCardPage.selectFirst("h1.detail-goods-title");
-        String name = nameElement != null ? nameElement.text() : null;
+        String name = getElementText(nameElement);
         product.setName(name);
 
         Element priceElement = docProductCardPage.selectFirst("div.price-box.price_block>span.price");
-        String price = priceElement != null ? priceElement.text() : null;
+        String price = getElementText(priceElement);
         product.setPrice(price);
 
         StringBuilder description = new StringBuilder();
@@ -185,16 +206,24 @@ public class Parser {
         product.setUrl(productCardUrl);
 
         Element statusElement = docProductCardPage.selectFirst("div.detail-goods-status");
-        String status = statusElement != null ? statusElement.text() : null;
-        product.setAvailable(status != null && status.equalsIgnoreCase("В наявності"));
+        String status = getElementText(statusElement);
+        product.setAvailable("В наявності".equalsIgnoreCase(status));
 
         return product;
+    }
+
+    private String getElementText(Element element) {
+        return !Objects.isNull(element) && StringUtils.isNotBlank(element.text()) ? element.text() : "";
     }
 
     private <T> void getFor(List<T> list, Consumer<T> processor) {
         for (T el : list) {
             processor.accept(el);
         }
+    }
+
+    private int getRandomTimeout() {
+        return (int) (20 + Math.random() * 10);
     }
 }
 
