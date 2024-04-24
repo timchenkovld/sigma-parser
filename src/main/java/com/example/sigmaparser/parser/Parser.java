@@ -17,8 +17,9 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
+
+import static com.example.sigmaparser.utils.ParserUtils.*;
 
 
 @Component
@@ -51,15 +52,6 @@ public class Parser {
             });
         });
         executor.shutdown();
-    }
-
-    private <T> List<List<T>> divideList(List<T> list, int parts) {
-        List<List<T>> dividedList = new ArrayList<>();
-        int chunkSize = (int) Math.ceil((double) list.size() / parts);
-        for (int i = 0; i < list.size(); i += chunkSize) {
-            dividedList.add(new ArrayList<>(list.subList(i, Math.min(i + chunkSize, list.size()))));
-        }
-        return dividedList;
     }
 
     public Set<Link> parseCategories() {
@@ -214,16 +206,6 @@ public class Parser {
 
     private String getElementText(Element element) {
         return !Objects.isNull(element) && StringUtils.isNotBlank(element.text()) ? element.text() : "";
-    }
-
-    private <T> void getFor(List<T> list, Consumer<T> processor) {
-        for (T el : list) {
-            processor.accept(el);
-        }
-    }
-
-    private int getRandomTimeout() {
-        return (int) (20 + Math.random() * 10);
     }
 }
 
