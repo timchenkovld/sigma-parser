@@ -3,7 +3,6 @@ package com.example.sigmaparser.parser;
 import com.example.sigmaparser.model.*;
 import com.example.sigmaparser.service.CategoryService;
 import com.example.sigmaparser.service.ProductService;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -32,8 +31,7 @@ public class Parser {
     private final ProductService productService;
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
 
-    @PostConstruct
-    public void init() {
+    public void parse() {
         parseCategories();
 
         List<Category> categories = categoryService.getAllCategories().stream()
@@ -54,7 +52,7 @@ public class Parser {
         executor.shutdown();
     }
 
-    public Set<Link> parseCategories() {
+    private Set<Link> parseCategories() {
         Set<Link> links = new HashSet<>();
         try {
             Document doc = Jsoup.connect(SIGMA_URL).get();
@@ -123,7 +121,7 @@ public class Parser {
         return productListLink;
     }
 
-    public void parseProductCards(List<Category> categories) {
+    private void parseProductCards(List<Category> categories) {
         Set<String> visitedUrls = new HashSet<>();
         getFor(categories, category -> {
             String categoryUrl = category.getUrl();
@@ -132,7 +130,11 @@ public class Parser {
                 getFor(productCardUrls, productCardUrl -> {
                     try {
                         Product product = extractProductData(productCardUrl);
-                        productService.createProduct(product);
+
+                        Product existingProduct = productService.findProductByUrlAndName(product.getUrl(), product.getName());
+                        if (existingProduct == null) {
+                            productService.createProduct(product);
+                        }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
