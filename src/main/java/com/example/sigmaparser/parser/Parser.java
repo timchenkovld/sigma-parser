@@ -32,6 +32,8 @@ public class Parser {
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
 
     public void parse() {
+        List<Product> existingProducts = productService.getAllProducts();
+
         parseCategories();
 
         List<Category> categories = categoryService.getAllCategories().stream()
@@ -43,7 +45,7 @@ public class Parser {
             executor.submit(() -> {
                 try {
                     Thread.sleep(getRandomTimeout());
-                    parseProductCards(categoryChunk);
+                    parseProductCards(categoryChunk, existingProducts);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -121,7 +123,8 @@ public class Parser {
         return productListLink;
     }
 
-    private void parseProductCards(List<Category> categories) {
+
+    private void parseProductCards(List<Category> categories, List<Product> existingProducts) {
         Set<String> visitedUrls = new HashSet<>();
         getFor(categories, category -> {
             String categoryUrl = category.getUrl();
@@ -131,8 +134,8 @@ public class Parser {
                     try {
                         Product product = extractProductData(productCardUrl);
 
-                        Product existingProduct = productService.findProductByUrlAndName(product.getUrl(), product.getName());
-                        if (existingProduct == null) {
+                        boolean isNewProduct = isNewProduct(product, existingProducts);
+                        if (isNewProduct) {
                             productService.createProduct(product);
                         }
                     } catch (IOException e) {
@@ -143,6 +146,15 @@ public class Parser {
                 e.printStackTrace();
             }
         });
+    }
+
+    private boolean isNewProduct(Product product, List<Product> existingProducts) {
+        for (Product existingProduct : existingProducts) {
+            if (existingProduct.getUrl().equals(product.getUrl()) && existingProduct.getName().equals(product.getName())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private List<String> extractProductCardUrls(String categoryUrl, Set<String> visitedUrls) throws IOException {
