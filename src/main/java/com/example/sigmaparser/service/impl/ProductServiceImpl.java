@@ -6,6 +6,8 @@ import com.example.sigmaparser.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
@@ -20,5 +22,10 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public Product findProductByUrlAndName(String url, String name) {
         return productRepository.findByUrlAndName(url, name);
+    }
+
+    @Override
+    public List<Product> getAllProducts() {
+        return productRepository.findAll();
     }
 }
