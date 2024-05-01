@@ -50,16 +50,27 @@ public class ConvertServiceImpl implements ConvertService {
     }
 
     private void fillData(Sheet sheet) {
-        //TODO сделать 200-500 запросов в цикле
-        List<Product> products = productService.getAllProducts();
         int rowNum = 1;
-        for (Product product : products) {
-            Row row = sheet.createRow(rowNum++);
-            row.createCell(0).setCellValue(product.getName());
-            row.createCell(1).setCellValue(product.getPrice());
-            row.createCell(2).setCellValue(product.getDescription());
-            row.createCell(3).setCellValue(product.isAvailable() ? "Available" : "Not Available");
-            row.createCell(4).setCellValue(product.getUrl());
+        int batchSize = 500;
+        int parts = 0;
+
+        while (true) {
+            List<Product> products = productService.getProductsByParts(parts, batchSize);
+            if (products.isEmpty()) {
+                break;
+            }
+
+            System.out.println("Received " + products.size() + " products on part " + parts);
+
+            for (Product product : products) {
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue(product.getName());
+                row.createCell(1).setCellValue(product.getPrice());
+                row.createCell(2).setCellValue(product.getDescription());
+                row.createCell(3).setCellValue(product.isAvailable() ? "Available" : "Not Available");
+                row.createCell(4).setCellValue(product.getUrl());
+            }
+            parts++;
         }
     }
 }
