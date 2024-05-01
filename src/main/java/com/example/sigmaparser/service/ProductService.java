@@ -8,4 +8,5 @@ public interface ProductService {
     Product createProduct(Product product);
     Product findProductByUrlAndName(String url, String name);
     List<Product> getAllProducts();
+    List<Product> getProductsByParts(int page, int pageSize);
 }

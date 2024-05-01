@@ -5,6 +5,8 @@ import com.example.sigmaparser.repository.ProductRepository;
 import com.example.sigmaparser.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -28,4 +30,11 @@ public class ProductServiceImpl implements ProductService {
     public List<Product> getAllProducts() {
         return productRepository.findAll();
     }
+
+    @Override
+    public List<Product> getProductsByParts(int part, int batchSize) {
+        Pageable pageable = PageRequest.of(part, batchSize);
+        return productRepository.findAll(pageable).getContent();
+    }
+
 }
