@@ -12,7 +12,9 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
 import java.io.IOException;
+import java.sql.*;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,7 +31,9 @@ public class Parser {
     private final CategoryService categoryService;
 
     private final ProductService productService;
-    private final ExecutorService executor = Executors.newFixedThreadPool(4);
+
+    private final DataSource dataSource;
+    private final ExecutorService executor = Executors.newFixedThreadPool(5);
 
     public void parse() {
         List<Product> existingProducts = productService.getAllProducts();
@@ -130,18 +134,21 @@ public class Parser {
             String categoryUrl = category.getUrl();
             try {
                 List<String> productCardUrls = extractProductCardUrls(categoryUrl, visitedUrls);
+                List<Product> products = new ArrayList<>();
                 getFor(productCardUrls, productCardUrl -> {
                     try {
                         Product product = extractProductData(productCardUrl);
 
                         boolean isNewProduct = isNewProduct(product, existingProducts);
                         if (isNewProduct) {
-                            productService.createProduct(product);
+                            products.add(product);
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
                 });
+//                productService.saveAll(products);
+                batchInsertProducts(products);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -149,12 +156,55 @@ public class Parser {
     }
 
     private boolean isNewProduct(Product product, List<Product> existingProducts) {
-        for (Product existingProduct : existingProducts) {
-            if (existingProduct.getUrl().equals(product.getUrl()) && existingProduct.getName().equals(product.getName())) {
-                return false;
+        return !existingProducts.contains(product);
+    }
+
+    private void batchInsertProducts(List<Product> products) {
+        try (Connection connection = dataSource.getConnection()) {
+            try (PreparedStatement productStatement = connection.prepareStatement(
+                    "INSERT INTO product (name, price, description, url, available) VALUES (?, ?, ?, ?, ?)",
+                    Statement.RETURN_GENERATED_KEYS)) {
+                int batchSize = 40;
+                int count = 0;
+
+                for (Product product : products) {
+                    productStatement.setString(1, product.getName());
+                    productStatement.setString(2, product.getPrice());
+                    productStatement.setString(3, product.getDescription());
+                    productStatement.setString(4, product.getUrl());
+                    productStatement.setBoolean(5, product.isAvailable());
+
+                    productStatement.addBatch();
+
+                    count++;
+                    if (count % batchSize == 0 || count == products.size()) {
+                        productStatement.executeBatch();
+
+                        try (ResultSet generatedKeys = productStatement.getGeneratedKeys()) {
+                            int index = 0;
+                            while (generatedKeys.next()) {
+                                long productId = generatedKeys.getLong(1);
+                                List<ProductImage> images = products.get(index++).getImages();
+
+                                try (PreparedStatement imageStatement = connection.prepareStatement(
+                                        "INSERT INTO product_image (product_id, image_url) VALUES (?, ?)")) {
+                                    for (ProductImage image : images) {
+                                        imageStatement.setLong(1, productId);
+                                        imageStatement.setString(2, image.getImageUrl());
+                                        imageStatement.addBatch();
+                                    }
+                                    imageStatement.executeBatch();
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
-        return true;
     }
 
     private List<String> extractProductCardUrls(String categoryUrl, Set<String> visitedUrls) throws IOException {

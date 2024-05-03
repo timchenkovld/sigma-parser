@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Getter
@@ -14,7 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "product")
-public class Product {
+public class Product implements Comparable<Product> {
     @Id
     @Column(name = "product_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,4 +38,27 @@ public class Product {
 
     @Column(name = "available")
     private boolean isAvailable;
+
+    @Override
+    public int compareTo(Product o) {
+        int nameComparison = this.name.compareTo(o.name);
+        if (nameComparison != 0) {
+            return nameComparison;
+        }
+
+        return this.url.compareTo(o.url);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Product product = (Product) o;
+        return Objects.equals(name, product.name) && Objects.equals(url, product.url);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, url);
+    }
 }
