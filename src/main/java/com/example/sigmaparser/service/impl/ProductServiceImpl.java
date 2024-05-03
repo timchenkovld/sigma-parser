@@ -3,6 +3,7 @@ package com.example.sigmaparser.service.impl;
 import com.example.sigmaparser.model.Product;
 import com.example.sigmaparser.repository.ProductRepository;
 import com.example.sigmaparser.service.ProductService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.PageRequest;
@@ -37,4 +38,9 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.findAll(pageable).getContent();
     }
 
+    @Transactional
+    @Override
+    public void saveAll(List<Product> products) {
+        productRepository.saveAll(products);
+    }
 }
