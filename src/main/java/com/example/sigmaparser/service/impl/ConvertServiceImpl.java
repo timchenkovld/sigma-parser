@@ -1,6 +1,7 @@
 package com.example.sigmaparser.service.impl;
 
 import com.example.sigmaparser.model.Product;
+import com.example.sigmaparser.model.ProductImage;
 import com.example.sigmaparser.service.ConvertService;
 import com.example.sigmaparser.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class ConvertServiceImpl implements ConvertService {
         headerRow.createCell(2).setCellValue("Description");
         headerRow.createCell(3).setCellValue("Available");
         headerRow.createCell(4).setCellValue("URL");
+        headerRow.createCell(5).setCellValue("Image URLs");
 
         int columnWidthChars = 20;
         sheet.setColumnWidth(0, columnWidthChars * 256);
@@ -69,8 +71,25 @@ public class ConvertServiceImpl implements ConvertService {
                 row.createCell(2).setCellValue(product.getDescription());
                 row.createCell(3).setCellValue(product.isAvailable() ? "Available" : "Not Available");
                 row.createCell(4).setCellValue(product.getUrl());
+
+                String imageUrls = getProductImageUrls(product);
+                row.createCell(5).setCellValue(imageUrls);
             }
             parts++;
         }
+    }
+
+    private String getProductImageUrls(Product product) {
+        List<ProductImage> productImages = product.getImages();
+        StringBuilder imageUrlBuilder = new StringBuilder();
+        int imageCount = 0;
+        for (ProductImage productImage : productImages) {
+            if (imageCount >= 15) {
+                break;
+            }
+            imageUrlBuilder.append(productImage.getImageUrl()).append(";");
+            imageCount++;
+        }
+        return imageUrlBuilder.toString();
     }
 }
