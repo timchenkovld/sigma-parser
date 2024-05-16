@@ -41,11 +41,6 @@ public class Product implements Comparable<Product> {
 
     @Override
     public int compareTo(Product o) {
-        int nameComparison = this.name.compareTo(o.name);
-        if (nameComparison != 0) {
-            return nameComparison;
-        }
-
         return this.url.compareTo(o.url);
     }
 

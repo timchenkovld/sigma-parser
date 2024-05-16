@@ -3,18 +3,27 @@ package com.example.sigmaparser.service.impl;
 import com.example.sigmaparser.model.Product;
 import com.example.sigmaparser.repository.ProductRepository;
 import com.example.sigmaparser.service.ProductService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
+    private final DataSource dataSource;
 
     @Override
     public Product createProduct(Product product) {
@@ -38,9 +47,33 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.findAll(pageable).getContent();
     }
 
-    @Transactional
     @Override
-    public void saveAll(List<Product> products) {
-        productRepository.saveAll(products);
+    public void saveAll(Set<Product> products) {
+        productRepository.saveAllAndFlush(products);
+    }
+
+    @Override
+    public Set<Product> existAll(Set<Product> products) {
+        Set<Product> uniqueProducts = new HashSet<>();
+        try (Connection connection = dataSource.getConnection()) {
+            PreparedStatement preparedStatement = connection.prepareStatement("select * from product p " +
+                    "where p.url = ? and p.name = ?");
+
+            for (Product product : products) {
+                preparedStatement.setString(1, product.getUrl());
+                preparedStatement.setString(2, product.getName());
+
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    if (!resultSet.next()) {
+                        uniqueProducts.add(product);
+                    }
+                }
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        log.info("Unique products were {}/{}", uniqueProducts.size(), products.size());
+        return uniqueProducts;
     }
 }
