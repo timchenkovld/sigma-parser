@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 @RequiredArgsConstructor
@@ -49,6 +50,7 @@ public class ConvertServiceImpl implements ConvertService {
         int columnWidthChars = 20;
         sheet.setColumnWidth(0, columnWidthChars * 256);
         sheet.setColumnWidth(2, columnWidthChars * 512);
+        sheet.setColumnWidth(4, columnWidthChars * 512);
     }
 
     private void fillData(Sheet sheet) {
@@ -72,24 +74,13 @@ public class ConvertServiceImpl implements ConvertService {
                 row.createCell(3).setCellValue(product.isAvailable() ? "Available" : "Not Available");
                 row.createCell(4).setCellValue(product.getUrl());
 
-                String imageUrls = getProductImageUrls(product);
+                String imageUrls = product.getImages()
+                        .stream().limit(15)
+                        .map(ProductImage::getImageUrl)
+                        .collect(Collectors.joining(";"));
                 row.createCell(5).setCellValue(imageUrls);
             }
             parts++;
         }
-    }
-
-    private String getProductImageUrls(Product product) {
-        List<ProductImage> productImages = product.getImages();
-        StringBuilder imageUrlBuilder = new StringBuilder();
-        int imageCount = 0;
-        for (ProductImage productImage : productImages) {
-            if (imageCount >= 15) {
-                break;
-            }
-            imageUrlBuilder.append(productImage.getImageUrl()).append(";");
-            imageCount++;
-        }
-        return imageUrlBuilder.toString();
     }
 }

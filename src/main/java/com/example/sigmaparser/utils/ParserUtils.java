@@ -1,13 +1,14 @@
 package com.example.sigmaparser.utils;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
 
 public class ParserUtils {
 
-    public static <T> void getFor(List<T> list, Consumer<T> processor) {
-        for (T el : list) {
+    public static <T> void execFor(Collection<T> collection, Consumer<T> processor) {
+        for (T el : collection) {
             processor.accept(el);
         }
     }
