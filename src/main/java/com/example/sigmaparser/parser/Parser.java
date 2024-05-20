@@ -1,5 +1,6 @@
 package com.example.sigmaparser.parser;
 
+import com.example.sigmaparser.async.ProductParsingAction;
 import com.example.sigmaparser.model.*;
 import com.example.sigmaparser.service.CategoryService;
 import com.example.sigmaparser.service.ProductService;
@@ -16,8 +17,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
 
 import static com.example.sigmaparser.utils.ParserUtils.*;
@@ -28,12 +28,12 @@ import static com.example.sigmaparser.utils.ParserUtils.*;
 @RequiredArgsConstructor
 public class Parser {
     private static final String SIGMA_URL = "https://sigma.ua/";
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final CategoryService categoryService;
 
     private final ProductService productService;
-    private final ExecutorService executor = Executors.newFixedThreadPool(3);
-    private static final int MAX_RETRY_ATTEMPTS = 3;
+    private final ForkJoinPool forkJoinPool = new ForkJoinPool(3);
 
     public void parse() {
         parseRootCategories();
@@ -41,19 +41,10 @@ public class Parser {
         List<Category> categories = categoryService.getAllCategories().stream()
                 .filter(category -> category.getParentCategory() != null).collect(Collectors.toList());
 
-        List<List<Category>> dividedCategories = divideList(categories, 3);
+        ProductParsingAction mainAction = new ProductParsingAction(categories, this);
+        forkJoinPool.invoke(mainAction);
 
-        execFor(dividedCategories, categoryChunk -> {
-            executor.submit(() -> {
-                try {
-                    Thread.sleep(getRandomTimeout());
-                    parseProductCards(categoryChunk);
-                } catch (InterruptedException e) {
-                    log.error("Error occurred while parsing shop: {}", e.getMessage());
-                }
-            });
-        });
-        executor.shutdown();
+        forkJoinPool.shutdown();
     }
 
     private void parseRootCategories() {
@@ -119,7 +110,7 @@ public class Parser {
         return productListLink;
     }
 
-    private void parseProductCards(List<Category> categories) {
+    public void parseProductCards(List<Category> categories) {
         Set<String> visitedUrls = new HashSet<>();
 
         execFor(categories, category -> {
@@ -127,10 +118,13 @@ public class Parser {
 
             String categoryUrl = category.getUrl();
             Set<String> productCardUrls = extractProductListUrls(categoryUrl, visitedUrls);
+
             Set<Product> products = new HashSet<>();
             execFor(productCardUrls, productCardUrl -> {
                 Product product = extractProductData(productCardUrl, unparsedUrls);
-                products.add(product);
+                if (isNotEmpty(product)) {
+                    products.add(product);
+                }
             });
 
             Set<Product> uniqueProducts = productService.existAll(products);
@@ -140,6 +134,10 @@ public class Parser {
                 saveUnparsedProducts(unparsedUrls);
             }
         });
+    }
+
+    private boolean isNotEmpty(Product product) {
+        return product.getName() == null || product.getName().isEmpty() || product.getUrl() == null || product.getUrl().isEmpty() ? false : true;
     }
 
     private void saveUnparsedProducts(Set<String> unparsedUrls) {
