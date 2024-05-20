@@ -73,7 +73,6 @@ public class ProductServiceImpl implements ProductService {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-        log.info("Unique products were {}/{}", uniqueProducts.size(), products.size());
         return uniqueProducts;
     }
 }
