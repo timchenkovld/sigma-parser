@@ -10,6 +10,6 @@ public interface ProductService {
     Product findProductByUrlAndName(String url, String name);
     List<Product> getAllProducts();
     List<Product> getProductsByParts(int page, int pageSize);
-    void saveAll(Set<Product> products);
+    Set<Product> saveAll(Set<Product> products);
     Set<Product> existAll(Set<Product> products);
 }
