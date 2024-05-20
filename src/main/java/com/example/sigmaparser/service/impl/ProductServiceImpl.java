@@ -48,8 +48,9 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public void saveAll(Set<Product> products) {
+    public Set<Product> saveAll(Set<Product> products) {
         productRepository.saveAllAndFlush(products);
+        return products;
     }
 
     @Override

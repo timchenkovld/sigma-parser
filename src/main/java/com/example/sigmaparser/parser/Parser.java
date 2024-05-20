@@ -149,7 +149,9 @@ public class Parser {
             }
         });
 
-        productService.saveAll(unparsedProducts);
+        Set<Product> savedProducts = productService.saveAll(unparsedProducts);
+
+        execFor(savedProducts, product -> log.info("Unparsed product saved with ID: {}, name: {}", product.getId(), product.getName()));
     }
 
     private Set<String> extractProductListUrls(String categoryUrl, Set<String> visitedUrls) {
